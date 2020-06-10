@@ -8,7 +8,9 @@ import com.yundasys.es.operation.exception.ClientBussinessException;
 import com.yundasys.es.operation.model.Hit;
 import com.yundasys.es.operation.model.Sort;
 import com.yundasys.es.operation.constant.SortType;
+import com.yundasys.es.operation.model.request.SearchResult;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,7 +29,9 @@ public class ClientPageUtil {
     }
 
 
-    public static <T> ClientPageInfo<T> page(Long total, List<Hit> hits, Class<T> targetClz) {
+    public static <T> ClientPageInfo<T> page(SearchResult searchResult, Class<T> targetClz) {
+
+        List<Hit> hits = searchResult.getHits();
         List<T> targetList = new ArrayList<>(hits.size());
 
         for (Hit hit : hits) {
@@ -35,7 +39,7 @@ public class ClientPageUtil {
             targetList.add(target);
         }
         ClientPageInfo<T> pageInfo = new ClientPageInfo<>();
-        pageInfo.setTotal(total);
+        pageInfo.setTotal(searchResult.getTotal());
         pageInfo.setList(targetList);
         return pageInfo;
     }
@@ -47,13 +51,11 @@ public class ClientPageUtil {
      * @param condition
      */
     public static Sort[] setSortInfo(ClientRequest request) {
-        if (ClientStringUtil.isNotEmpty(request.getSortField())) {
-            String underlineStr = ClientStringUtil.camelhumpToUnderline(request.getSortField());
-
+        if (StringUtils.isNotEmpty(request.getSortField())) {
 
                 Sort[] sorts = new Sort[]{new Sort()};
-                sorts[0].setField(underlineStr);
-                if (ClientStringUtil.isNotEmpty(request.getSortType())) {
+                sorts[0].setField(request.getSortField());
+                if (StringUtils.isNotEmpty(request.getSortType())) {
                     if (sortNames.contains(request.getSortType().toUpperCase())) {
                         sorts[0].setType(SortType.valueOf(request.getSortType().toUpperCase()));
                     }else{

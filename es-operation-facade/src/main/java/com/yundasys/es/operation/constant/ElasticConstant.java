@@ -21,4 +21,12 @@ public interface ElasticConstant {
     
     // 嵌套桶最大层数
     int INNER_BUCKET_MAX_LOOP = 5;
+
+    String GROUP_BY_KEY = "groupByKey";//groupby key名称
+
+    String FIELD_CAL_SUFFIX = "Key";//统计字段的key后缀
+
+    String SCRIPT_MULTI_GROUP_BY_SPLIT = "##";//group by 脚本分割符
+
+    String DATE_HISTOGRAM_JSON_INNER_KEY = "innerGroupBy";//处理date agg信息时候里面一层的list jsonkey
 }

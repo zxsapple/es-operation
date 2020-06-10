@@ -11,21 +11,15 @@ import com.yundasys.es.operation.exception.ESOperationException;
 import com.yundasys.es.operation.model.IndexInfo;
 import com.yundasys.es.operation.model.Range;
 import com.yundasys.es.operation.model.Sort;
-import com.yundasys.es.operation.model.TopHits;
-import com.yundasys.es.operation.model.TopHitsAggCriterion;
-import com.yundasys.es.operation.model.agg.AggBucket;
-import com.yundasys.es.operation.model.agg.AggCondition;
-import com.yundasys.es.operation.model.agg.AggCriterion;
-import com.yundasys.es.operation.model.agg.AggDateHistogramBucket;
-import com.yundasys.es.operation.model.agg.AggFilterBucket;
-import com.yundasys.es.operation.model.agg.AggTermsBucket;
-import com.yundasys.es.operation.model.request.BaseCondition;
 import com.yundasys.es.operation.model.request.CompoundCriteria;
 import com.yundasys.es.operation.model.request.Criteria;
-import com.yundasys.es.operation.model.request.SearchByConditionRequest;
-import com.yundasys.es.operation.model.request.SearchCondition;
 import com.yundasys.es.operation.model.request.SearchField;
 import com.yundasys.es.operation.util.DateUtil;
+import com.yundasys.es.operation.model.agg.AggCondition;
+import com.yundasys.es.operation.model.agg.AggDateCondition;
+import com.yundasys.es.operation.model.agg.CalField;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.ArrayUtils;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
@@ -35,44 +29,33 @@ import org.elasticsearch.script.ScriptType;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.BucketOrder;
-import org.elasticsearch.search.aggregations.bucket.filter.FilterAggregationBuilder;
-import org.elasticsearch.search.aggregations.bucket.global.GlobalAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramInterval;
-import org.elasticsearch.search.aggregations.bucket.histogram.ExtendedBounds;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.TopHitsAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.sort.FieldSortBuilder;
-import org.elasticsearch.search.sort.SortBuilder;
-import org.elasticsearch.search.sort.SortOrder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
+/**
+ * @author zhengxiaosu
+ * @desc  请求es前的条件处理
+ * @date 2020/6/3 14:29
+ */
 @Component
+@Slf4j
 public class ESBuilderHelper {
-
-    private Logger logger = LoggerFactory.getLogger(getClass());
 
     private static final String SCRIPT_UPD_PREFIX = "ctx._source.";
     private static final String SCRIPT_FIELD_VALUE_PREFIX = "doc['";
     private static final String SCRIPT_FIELD_VALUE_SUFFIX = "'].value";
     private static final String SCRIPT_FIELD_EQUALS_SYMBOL = " == ";
     private static final String SCRIPT_FIELD_NOT_EQUALS_SYMBOL = " != ";
-    private static final String SCRIPT_MULTI_GROUP_BY_CONNECT_SYMBOL = " + '-' + ";
+    private static final String SCRIPT_MULTI_GROUP_BY_CONNECT_SYMBOL = " + '" + ElasticConstant.SCRIPT_MULTI_GROUP_BY_SPLIT + "' + ";//group by 脚本分割符
     private static final String SCRIPT_MULTI_GROUP_BY_CONNECT_PLUS_PREFIX = " + '";
     private static final String SCRIPT_MULTI_GROUP_BY_CONNECT_PLUS_SUFFIX = "' + ";
     private static final String SCRIPT_FIELD_GREATER_THAN_SYMBOL = " > ";
@@ -117,8 +100,6 @@ public class ESBuilderHelper {
         			BoolQueryBuilder subBoolQueryBuilder = createBoolQueryBuilder(indexInfo, criteria.getCriteria());
                     oredBoolQueryBuilder.should(subBoolQueryBuilder);
         		}
-                /*BoolQueryBuilder subBoolQueryBuilder = createBoolQueryBuilder(indexInfo, criteria.getCriteria());
-                oredBoolQueryBuilder.should(subBoolQueryBuilder);*/
             }
 
         	boolQueryBuilder.filter(oredBoolQueryBuilder);
@@ -138,63 +119,36 @@ public class ESBuilderHelper {
         return boolQueryBuilder;
     }
     
-    /**
-     * build aggs
-     * @param aggFields
-     * @param searchRequestBuilder
-     * @throws ESOperationException
-     */
-    public void buildAggs(IndexInfo indexInfo, List<AggCondition> aggConditions, SearchSourceBuilder searchSourceBuilder)  {
-        if (!CollectionUtils.isEmpty(aggConditions)) {
-            for (AggCondition aggCondition : aggConditions) {
-                List<AbstractAggregationBuilder<?>> aggregationBuilders = buildSingleAgg(indexInfo, aggCondition, 1);
-                for (AbstractAggregationBuilder<?> aggregationBuilder : aggregationBuilders) {
-                    searchSourceBuilder.aggregation(aggregationBuilder);
+
+    public void buildAggs(IndexInfo indexInfo, AggDateCondition aggDateCondition, SearchSourceBuilder searchSourceBuilder) {
+        if (aggDateCondition == null) {
+            return;
+        }
+        //时间汇总
+        if (!StringUtils.isEmpty(aggDateCondition.getDateField())) {
+            DateHistogramAggregationBuilder dateHistogramAggregationBuilder = buildDateHistogram(aggDateCondition);
+            searchSourceBuilder.aggregation(dateHistogramAggregationBuilder);
+        } else {
+            AggCondition aggCondition = aggDateCondition.getAggCondition();
+            if (aggCondition != null) {//没有时间汇总 仅group by
+                if (ArrayUtils.isEmpty(aggCondition.getGroupByFields())) {//没有 group by的字段
+
+                    if (ArrayUtils.isEmpty(aggCondition.getCalFields())) {
+                        //AggCondition 里2个重要字段全为空 忽略
+                        log.error("aggCondition 信息里没有聚合字段,也没有分组字段  {}", indexInfo.getIndexes());
+                    } else {
+                        for (int i = 0; i < aggCondition.getCalFields().length; i++) {//直接聚合查询条件
+                            searchSourceBuilder.aggregation(buildCriterion(aggCondition.getCalFields()[i]));
+                        }
+                    }
+                } else {
+                    searchSourceBuilder.aggregation(buildTermsAgg(aggCondition));
                 }
             }
         }
     }
-    
-    /**
-     * build update script
-     * @param mapObj
-     * @return
-     */
-    public Script buildUpdScript(Map<String, Object> mapObj) {
-        Map<String, Object> newMapObj = new HashMap<String, Object>();
-        StringBuilder sb = new StringBuilder();
-        
-        for (String key : mapObj.keySet()) {
-            newMapObj.put(SCRIPT_UPD_PREFIX + key, mapObj.get(key));
-            sb.append(SCRIPT_UPD_PREFIX).append(key).append("=").append(mapObj.get(key)).append(";");
-        }
-        
-        Script script = new Script(sb.toString());
-        
-        return script;
-    }
-    
-    /**
-     * build search request--for search total size
-     * @param downloadRequest
-     * @return
-     */
-    public SearchByConditionRequest buildSizeSearchRequest(IndexInfo indexInfo, BaseCondition condition) {
-    	SearchByConditionRequest searchRequest = new SearchByConditionRequest();
-        searchRequest.setIndexInfo(indexInfo);
-        
-        SearchCondition newCondition = new SearchCondition();
-        BeanUtils.copyProperties(condition, newCondition);
-        newCondition.setPageNo(1);
-        newCondition.setPageSize(0);
-        newCondition.setIncludes(new String[] {});
-        newCondition.setSorts(null);
-        newCondition.setAggConditions(null);
-        searchRequest.setSearchCondition(newCondition);
-        
-        return searchRequest;
-    }
-    
+
+
     private void boolQueryBuilder(SearchLogic searchLogic, QueryBuilder queryBuilder,
                                   BoolQueryBuilder boolQueryBuilder) throws ESOperationException {
         switch (searchLogic) {
@@ -211,8 +165,8 @@ public class ESBuilderHelper {
             boolQueryBuilder.filter(queryBuilder);
             break;
         default:
-            logger.error("Unsupported SearchLogic");
-            throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, "Unsupported SearchLogic");
+            log.error("不支持的 SearchLogic");
+            throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, "不支持的 SearchLogic");
         }
     }
     
@@ -296,7 +250,7 @@ public class ESBuilderHelper {
             queryBuilder = buildScriptQuery(searchField);
             break;
         default:
-            logger.error("Unsupported SearchType");
+            log.error("Unsupported SearchType");
             throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, "Unsupported SearchType");
         }
 
@@ -349,7 +303,7 @@ public class ESBuilderHelper {
         	validateValue(searchField);
             break;
         default:
-            logger.error("Unsupported SearchType");
+            log.error("Unsupported SearchType");
             throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, "Unsupported SearchType");
         }
     }
@@ -427,7 +381,7 @@ public class ESBuilderHelper {
     
     private RangeQueryBuilder buildRangeQuery(SearchField searchField) {
         RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(searchField.getName());
-        Range range = null;
+        Range range ;
         
         if (searchField.getValue() instanceof Range) {
             range = (Range) searchField.getValue();
@@ -463,221 +417,94 @@ public class ESBuilderHelper {
         
         return value;
     }
-    
-    private List<AbstractAggregationBuilder<?>> buildSingleAgg(IndexInfo indexInfo, AggCondition aggCondition, int loopTimes) throws ESOperationException {
-        // check loop, avoid endless loop
-        checkLoop(loopTimes);
-        AggBucket aggBucket = aggCondition.getAggBucket();
-        switch (aggBucket.getAggBucketType()) {
-        case AGG_BUCKET_TERMS:
-            // terms bucket
-            AggTermsBucket aggTermsBucket =  aggBucket.getAggTermsBucket();
-            TermsAggregationBuilder termsAggregationBuilder = buildTermsBucket(indexInfo, aggTermsBucket, aggCondition, loopTimes);
-            return Arrays.asList(termsAggregationBuilder);
-        case AGG_BUCKET_FILTER:
-            // filter bucket
-            AggFilterBucket aggFilterBucket =  aggBucket.getAggFilterBucket();
-            FilterAggregationBuilder filterAggregationBuilder = buildFilterBucket(indexInfo, aggFilterBucket, aggCondition, loopTimes);
-            return Arrays.asList(filterAggregationBuilder);
-        case AGG_BUCKET_GLOBAL:
-            // global bucket
-            GlobalAggregationBuilder globalAggregationBuilder = buildGlobalBucket(indexInfo, aggCondition, loopTimes);
-            return Arrays.asList(globalAggregationBuilder);
-        case AGG_BUCKET_DATE_HISTOGRAM:
-            // date_histogram
-            AggDateHistogramBucket aggDateHistogramBucket =  aggBucket.getAggDateHistogramBucket();
-            DateHistogramAggregationBuilder dateHistogramCriteria = buildDateHistogramBucket(indexInfo, aggDateHistogramBucket, aggCondition, loopTimes);
-            return Arrays.asList(dateHistogramCriteria);
-        case AGG_BUCKET_NONE:
-            // none bucket--criteria only
-            List<AbstractAggregationBuilder<?>> noneCriteria = buildNoneBucket(indexInfo, aggCondition, loopTimes);
-            return noneCriteria;
-        default:
-            logger.error("unsupported bucket type!");
-            throw new ESOperationException(ESErrorCode.PARAMETER_INCORRECT, "unsupported bucket type!");
-        }
-    }
-    
+
     /**
-     * avoid endless loop
-     * @param loop
-     * @throws ESOperationException
+     * 建立 DateHistogram
      */
-    private void checkLoop(int loopTimes) throws ESOperationException {
-        if (loopTimes > ElasticConstant.INNER_BUCKET_MAX_LOOP) {
-            throw new ESOperationException(ESErrorCode.INNER_BUCKET_MAX_LOOP_LIMIT, "inner bucket max loop limit:" + ElasticConstant.INNER_BUCKET_MAX_LOOP);
+    private DateHistogramAggregationBuilder buildDateHistogram(AggDateCondition aggDateCondition) {
+        // date_histogram bucket
+        DateHistogramInterval dateHistogramInterval = new DateHistogramInterval(aggDateCondition.getInterval());
+        DateHistogramAggregationBuilder dateHistogramAggregationBuilder = AggregationBuilders.dateHistogram(aggDateCondition.getDateField() + ElasticConstant.FIELD_CAL_SUFFIX)
+                .field(aggDateCondition.getDateField())
+                .calendarInterval(dateHistogramInterval);
+
+        // 排序
+
+        dateHistogramAggregationBuilder.order(buildHistogramAggOrder(aggDateCondition.getSortField(),aggDateCondition.getSortType()));
+
+        //时间分组本层聚合
+        if (!ArrayUtils.isEmpty(aggDateCondition.getCalFields())) {
+            for (CalField calField : aggDateCondition.getCalFields()) {
+                AbstractAggregationBuilder<?> criterion = buildCriterion(calField);
+                dateHistogramAggregationBuilder.subAggregation(criterion);
+            }
         }
+        //时间分组里面一层聚合
+        AggCondition AggCondition = aggDateCondition.getAggCondition();
+        if (AggCondition != null) {
+            // 拼接 group by脚本
+
+            TermsAggregationBuilder termsAggregationBuilder = buildTermsAgg(AggCondition);
+
+            dateHistogramAggregationBuilder.subAggregation(termsAggregationBuilder);
+        }
+
+
+        return dateHistogramAggregationBuilder;
     }
-    
+
     /**
-     * build TermsAggregationBuilder
-     * @param aggBucket
-     * @param aggCondition
-     * @return
-     * @throws ESOperationException
+     * group by 汇总 build建立
      */
-    private TermsAggregationBuilder buildTermsBucket(IndexInfo indexInfo, AggTermsBucket aggTermsBucket, AggCondition aggCondition, int loopTimes) throws ESOperationException {
-        //  自定义连接符
-    	// group by
-    	String connectSymbol = SCRIPT_MULTI_GROUP_BY_CONNECT_SYMBOL;
-    	if (!StringUtils.isEmpty(aggTermsBucket.getDelimiter())) {
-    		connectSymbol = SCRIPT_MULTI_GROUP_BY_CONNECT_PLUS_PREFIX + aggTermsBucket.getDelimiter() + SCRIPT_MULTI_GROUP_BY_CONNECT_PLUS_SUFFIX;
-    	}
-        Script script = buildGroupByScript(aggTermsBucket.getGroupBy(), connectSymbol);
-        TermsAggregationBuilder termsAggregationBuilder = AggregationBuilders.terms(aggCondition.getKey()).script(script);
-        
+    private TermsAggregationBuilder buildTermsAgg(AggCondition aggCondition) {
+      
+        Script script = buildGroupByScript(aggCondition.getGroupByFields(),SCRIPT_MULTI_GROUP_BY_CONNECT_SYMBOL);
+
+        TermsAggregationBuilder termsAggregationBuilder = AggregationBuilders.terms(ElasticConstant.GROUP_BY_KEY).script(script);
+
         // size
-        Integer size = aggTermsBucket.getSize();
+        Integer size = aggCondition.getSize();
         if (size == null) {
-        	size = ElasticConstant.AGG_MAX_BUCKET_SIZE;
+            size = ElasticConstant.AGG_MAX_BUCKET_SIZE;
         } else if (size > ElasticConstant.AGG_MAX_BUCKET_SIZE) {
-        	throw new ESOperationException(ESErrorCode.AGG_RESPONSE_SIZE_LIMIT, "agg response size can not be greater than " + ElasticConstant.AGG_MAX_BUCKET_SIZE);
+            throw new ESOperationException(ESErrorCode.AGG_RESPONSE_SIZE_LIMIT, "agg response size can not be greater than " + ElasticConstant.AGG_MAX_BUCKET_SIZE);
         }
         termsAggregationBuilder.size(size);
 
         // order
-        Sort[] sorts = aggTermsBucket.getSorts();
+        Sort[] sorts = aggCondition.getSorts();
         if (sorts != null && sorts.length > 0) {
             for (Sort sort : sorts) {
                 termsAggregationBuilder.order(buildAggOrder(sort));
             }
         }
-        
-        // criteria
-        List<AbstractAggregationBuilder<?>> termsCriteria = buildCriteria(aggCondition.getAggCriteria());
 
-        for (AbstractAggregationBuilder<?> criterion : termsCriteria) {
-            termsAggregationBuilder.subAggregation(criterion);
-        }
-        
-        if (!CollectionUtils.isEmpty(aggCondition.getInnerAggConditions())) {
-            // inner bucket
-            for (AggCondition innerAggCondition : aggCondition.getInnerAggConditions()) {
-                List<AbstractAggregationBuilder<?>> innerAggregationBuilders = buildSingleAgg(indexInfo, innerAggCondition, loopTimes + 1);
-                for (AbstractAggregationBuilder<?> innerAggregationBuilder : innerAggregationBuilders) {
-                    termsAggregationBuilder.subAggregation(innerAggregationBuilder);
-                }
+        // criteria
+
+        if (!ArrayUtils.isEmpty(aggCondition.getCalFields())) {
+            for (CalField calField : aggCondition.getCalFields()) {
+                AbstractAggregationBuilder<?> criterion = buildCriterion(calField);
+                termsAggregationBuilder.subAggregation(criterion);
             }
         }
-        
         return termsAggregationBuilder;
     }
-    
-    private FilterAggregationBuilder buildFilterBucket(IndexInfo indexInfo, AggFilterBucket aggFilterBucket, AggCondition aggCondition, int loopTimes) throws ESOperationException {
-        // filter bucket
-        QueryBuilder queryBuilder = createCompoundBoolQueryBuilder(indexInfo, aggFilterBucket.getCompoundCriteria());
-        FilterAggregationBuilder filterAggregationBuilder = AggregationBuilders.filter(aggCondition.getKey(), queryBuilder);
-        
-        // criteria
-        List<AbstractAggregationBuilder<?>> filterCriteria = buildCriteria(aggCondition.getAggCriteria());
 
-        for (AbstractAggregationBuilder<?> criterion : filterCriteria) {
-            filterAggregationBuilder.subAggregation(criterion);
-        }
-        
-        if (!CollectionUtils.isEmpty(aggCondition.getInnerAggConditions())) {
-            // inner bucket
-            for (AggCondition innerAggCondition : aggCondition.getInnerAggConditions()) {
-                List<AbstractAggregationBuilder<?>> innerAggregationBuilders = buildSingleAgg(indexInfo, innerAggCondition, loopTimes + 1);
-                for (AbstractAggregationBuilder<?> innerAggregationBuilder : innerAggregationBuilders) {
-                	filterAggregationBuilder.subAggregation(innerAggregationBuilder);
-                }
-            }
-        }
-        
-        return filterAggregationBuilder;
-    }
-    
-    private GlobalAggregationBuilder buildGlobalBucket(IndexInfo indexInfo, AggCondition aggCondition, int loopTimes) throws ESOperationException {
-        // global bucket
-        GlobalAggregationBuilder globalAggregationBuilder = AggregationBuilders.global(aggCondition.getKey());
-        
-        // criteria
-        List<AbstractAggregationBuilder<?>> globalCriteria = buildCriteria(aggCondition.getAggCriteria());
 
-        for (AbstractAggregationBuilder<?> criterion : globalCriteria) {
-            globalAggregationBuilder.subAggregation(criterion);
+    private BucketOrder buildHistogramAggOrder(String sortField, SortType sortType) {
+        if (AggInnerField.KEY.equals(sortField)) {
+            //key 排序 asc true  desc:false
+            return BucketOrder.key(SortType.ASC.equals(sortType));
         }
-        
-        if (!CollectionUtils.isEmpty(aggCondition.getInnerAggConditions())) {
-            // inner bucket
-            for (AggCondition innerAggCondition : aggCondition.getInnerAggConditions()) {
-                List<AbstractAggregationBuilder<?>> innerAggregationBuilders = buildSingleAgg(indexInfo, innerAggCondition, loopTimes + 1);
-                for (AbstractAggregationBuilder<?> innerAggregationBuilder : innerAggregationBuilders) {
-                	globalAggregationBuilder.subAggregation(innerAggregationBuilder);
-                }
-            }
-        }
-        
-        return globalAggregationBuilder;
-    }
-    
-    private DateHistogramAggregationBuilder buildDateHistogramBucket(IndexInfo indexInfo, AggDateHistogramBucket aggDateHistogramBucket, AggCondition aggCondition, int loopTimes) throws ESOperationException {
-        // date_histogram bucket
-        DateHistogramInterval dateHistogramInterval = new DateHistogramInterval(aggDateHistogramBucket.getInterval());
-        DateHistogramAggregationBuilder dateHistogramAggregationBuilder = AggregationBuilders.dateHistogram(aggCondition.getKey())
-                .field(aggDateHistogramBucket.getField())
-                .dateHistogramInterval(dateHistogramInterval);
-        
-        // order
-        Sort[] sorts = aggDateHistogramBucket.getSorts();
-        if (sorts != null && sorts.length > 0) {
-            for (Sort sort : sorts) {
-            	dateHistogramAggregationBuilder.order(buildHistogramAggOrder(sort));
-            }
-        }
-        
-        // format
-        if (!StringUtils.isEmpty(aggDateHistogramBucket.getFormat())) {
-            dateHistogramAggregationBuilder.format(aggDateHistogramBucket.getFormat());
-        }
-        
-        // minDocCount
-        if (aggDateHistogramBucket.getMinDocCount() != null) {
-            dateHistogramAggregationBuilder.minDocCount(aggDateHistogramBucket.getMinDocCount());
-        }
-        
-        // extendedBounds
-        if (!StringUtils.isEmpty(aggDateHistogramBucket.getBoundsMin())
-                || !StringUtils.isEmpty(aggDateHistogramBucket.getBoundsMax())) {
-            ExtendedBounds extendedBounds = new ExtendedBounds(aggDateHistogramBucket.getBoundsMin(), aggDateHistogramBucket.getBoundsMax());
-            dateHistogramAggregationBuilder.extendedBounds(extendedBounds);
-        }
-        
-        // criteria
-        List<AbstractAggregationBuilder<?>> filterCriteria = buildCriteria(aggCondition.getAggCriteria());
 
-        for (AbstractAggregationBuilder<?> criterion : filterCriteria) {
-            dateHistogramAggregationBuilder.subAggregation(criterion);
+        if (AggInnerField.COUNT.equals(sortField)) {
+            // count 排序 asc true  desc:false
+            return BucketOrder.count(SortType.ASC.equals(sortType));
         }
-        
-        if (!CollectionUtils.isEmpty(aggCondition.getInnerAggConditions())) {
-            // inner bucket
-            for (AggCondition innerAggCondition : aggCondition.getInnerAggConditions()) {
-                List<AbstractAggregationBuilder<?>> innerAggregationBuilders = buildSingleAgg(indexInfo, innerAggCondition, loopTimes + 1);
-                for (AbstractAggregationBuilder<?> innerAggregationBuilder : innerAggregationBuilders) {
-                    dateHistogramAggregationBuilder.subAggregation(innerAggregationBuilder);
-                }
-            }
-        }
-        
-        return dateHistogramAggregationBuilder;
+        return BucketOrder.aggregation(sortField, sortType.equals(SortType.ASC));
     }
-    
-    private List<AbstractAggregationBuilder<?>> buildNoneBucket(IndexInfo indexInfo, AggCondition aggCondition, int loopTimes) throws ESOperationException {
-        // criteria
-        List<AbstractAggregationBuilder<?>> noneCriteria = buildCriteria(aggCondition.getAggCriteria());
 
-        if (!CollectionUtils.isEmpty(aggCondition.getInnerAggConditions())) {
-            // inner bucket
-            for (AggCondition innerAggCondition : aggCondition.getInnerAggConditions()) {
-                List<AbstractAggregationBuilder<?>> innerAggregationBuilders = buildSingleAgg(indexInfo, innerAggCondition, loopTimes + 1);
-                noneCriteria.addAll(innerAggregationBuilders);
-            }
-        }
-        
-        return noneCriteria;
-    }
+
     
     private Script buildGroupByScript(String[] groupBy, String connectSymbol) {
         String esScript = "";
@@ -686,8 +513,6 @@ public class ESBuilderHelper {
             if (i == groupBy.length - 1) {
                 esScript += SCRIPT_FIELD_VALUE_PREFIX + groupByI + SCRIPT_FIELD_VALUE_SUFFIX;
             } else {
-            	//group by连接符
-                //esScript += SCRIPT_FIELD_VALUE_PREFIX + groupByI + SCRIPT_FIELD_VALUE_SUFFIX + SCRIPT_MULTI_GROUP_BY_CONNECT_SYMBOL;
             	esScript += SCRIPT_FIELD_VALUE_PREFIX + groupByI + SCRIPT_FIELD_VALUE_SUFFIX + connectSymbol;
             }
         }
@@ -698,63 +523,13 @@ public class ESBuilderHelper {
     private BucketOrder buildAggOrder(Sort sort) {
        return BucketOrder.aggregation(sort.getField(), sort.getType().equals(SortType.ASC));
     }
-    
-    private BucketOrder buildHistogramAggOrder(Sort sort) {
-    	if (AggInnerField.KEY.equals(sort.getField())) {
-    		// sort by key
-    		if (SortType.ASC.equals(sort.getType())) {
-    			// asc
-                return BucketOrder.key(true);
-    		} else {
-    			// desc
-                return BucketOrder.key(false);
-    		}
-    	}
-    	
-    	if (AggInnerField.COUNT.equals(sort.getField())) {
-    		// sort by count
-    		if (SortType.ASC.equals(sort.getType())) {
-    			// asc
-    			return BucketOrder.count(true);
-    		} else {
-    			// desc
-    			return BucketOrder.count(false);
-    		}
-    	}
-        return BucketOrder.aggregation(sort.getField(), sort.getType().equals(SortType.ASC));
-    }
-    
-    /**
-     * 构建指标
-     * @param AggCriterions
-     * @return
-     * @throws ESOperationException
-     */
-    private List<AbstractAggregationBuilder<?>> buildCriteria(List<AggCriterion> aggCriteria) throws ESOperationException {
-        List<AbstractAggregationBuilder<?>> result = new ArrayList<>();
-        
-        if (!CollectionUtils.isEmpty(aggCriteria)) {
-            for (AggCriterion aggCriterion : aggCriteria) {
-                AbstractAggregationBuilder<?> criterion = buildCriterion(aggCriterion);
-                result.add(criterion);
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * 构建指标
-     * @param aggCriterion
-     * @return
-     * @throws ESOperationException
-     */
-    private AbstractAggregationBuilder<?> buildCriterion(AggCriterion aggCriterion) throws ESOperationException {
+
+    private AbstractAggregationBuilder<?> buildCriterion(CalField calField) {
         AbstractAggregationBuilder<?> result = null;
-        
-        String field = aggCriterion.getField();
-        String name = aggCriterion.getKey();
-        switch (aggCriterion.getCriterionType()) {
+
+        String field = calField.getField();
+        String name = calField.getField()+ElasticConstant.FIELD_CAL_SUFFIX;
+        switch (calField.getCriterionType()) {
             case AGG_CRITERION_MIN:
                 result = AggregationBuilders
                         .min(name)
@@ -780,60 +555,14 @@ public class ESBuilderHelper {
                         .count(name)
                         .field(field);
                 break;
-            case AGG_CRITERION_TOP_HITS:
-                result = buildTopHits(name, (TopHitsAggCriterion)aggCriterion);
-                break;
             default:
-                logger.error("Unsupported AggType");
-                throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, "Unsupported AggType");
+                log.error("不支持的聚合类型 {}",calField.getCriterionType());
+                throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, "不支持的聚合类型");
         }
         return result;
     }
     
-    private TopHitsAggregationBuilder buildTopHits(String name, TopHitsAggCriterion topHitsAggCriterion) {
-        TopHits topHits = topHitsAggCriterion.getTopHits();
-        TopHitsAggregationBuilder builder = AggregationBuilders.topHits(name);
-        // from
-        if (topHits.getFrom() != null) {
-            builder.from(topHits.getFrom());
-        }
-        // size
-        if (topHits.getSize() != null) {
-            int size = topHits.getSize() > ElasticConstant.TOP_HITS_MAX_SIZE ? ElasticConstant.TOP_HITS_MAX_SIZE : topHits.getSize();
-            builder.size(size);
-        }
-        // includes
-        if (topHits.getIncludes() != null && topHits.getIncludes().length > 0) {
-            builder.fetchSource(topHits.getIncludes(), null);
-        }
-        // sort
-        if (topHits.getSorts() != null && topHits.getSorts().length > 0) {
-            Sort[] sorts = topHits.getSorts();
-            List<SortBuilder<?>> sortBuilders = new ArrayList<>();
-            for (Sort sort : sorts) {
-                FieldSortBuilder sortBuilder = new FieldSortBuilder(sort.getField());
-                SortOrder sortOrder;
-                switch (sort.getType()) {
-                case DESC:
-                    sortOrder = SortOrder.DESC;
-                    break;
-                case ASC:
-                    sortOrder = SortOrder.ASC;
-                    break;
-                default: 
-                    sortOrder = SortOrder.DESC; 
-                }
-                sortBuilder.order(sortOrder);
-                sortBuilders.add(sortBuilder);
-            }
-            builder.sorts(sortBuilders);
-        }
-        // a 返回id与version
-        builder.explain(false).version(true);
-        
-        return builder;
-    }
-    
+
     private Script buildFieldCompareScript(String[] fields, String symbol) {
         StringBuilder sb = new StringBuilder();
         sb.append(SCRIPT_FIELD_VALUE_PREFIX).append(fields[0]).append(SCRIPT_FIELD_VALUE_SUFFIX)

@@ -1,15 +1,34 @@
 package com.yundasys.es.operation.model.agg;
 
+import com.yundasys.es.operation.constant.SortType;
+import com.yundasys.es.operation.model.Sort;
 import lombok.Data;
 
-import java.io.Serializable;
-import java.util.List;
+/**
+ * @author zhengxiaosu
+ * @desc
+ * @date 2020/6/8 14:22
+ */
 @Data
-public class AggCondition implements Serializable {
+public class AggCondition {
+    /**
+     * group by 的字段
+     */
+    String[] groupByFields;
+    /**
+     * 需要汇总的字段
+     */
+    CalField[] calFields;
 
-     String key; // 聚合后主键
-     AggBucket aggBucket; // 桶
-     List<AggCriterion> aggCriteria; // 指标
-     List<AggCondition> innerAggConditions; // 嵌套桶条件
 
+    //以下 base
+
+    String[] sortField;
+
+    SortType[] sortType;
+
+    Sort[] sorts;
+
+    Integer size;
 }
+

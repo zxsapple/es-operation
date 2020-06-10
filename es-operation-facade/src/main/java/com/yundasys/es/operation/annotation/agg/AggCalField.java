@@ -1,4 +1,4 @@
-package com.yundasys.es.operation.annotation;
+package com.yundasys.es.operation.annotation.agg;
 
 
 import com.yundasys.es.operation.constant.AggCriterionType;
@@ -10,10 +10,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER })
+@Target(ElementType.FIELD)
 @Inherited
-public @interface AggCriterionAnnotation {
-	String field(); // 聚合域
-	//String key() default ""; // 聚合后主键
-	AggCriterionType aggCriterionType(); // 聚合类型
+public @interface AggCalField {
+    // 聚合字段为属性名称
+    AggCriterionType aggCriterionType(); // 聚合类型
 }

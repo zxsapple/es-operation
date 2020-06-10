@@ -6,14 +6,6 @@ package com.yundasys.es.operation.util;
  * @date 2020/6/3 11:38
  */
 public class ClientStringUtil {
-    public static boolean isEmpty(CharSequence cs) {
-        return cs == null || cs.length() == 0;
-    }
-
-    public static boolean isNotEmpty(CharSequence cs) {
-        return !isEmpty(cs);
-    }
-
     /***
      * 下划线命名转为驼峰命名
      *

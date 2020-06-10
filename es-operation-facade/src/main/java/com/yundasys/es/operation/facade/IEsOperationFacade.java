@@ -1,13 +1,11 @@
 package com.yundasys.es.operation.facade;
 
-import com.yundasys.es.operation.model.response.ESBaseResponse;
 import com.yundasys.es.operation.model.request.SearchByConditionRequest;
 import com.yundasys.es.operation.model.request.SearchResult;
+import com.yundasys.es.operation.model.response.ESBaseResponse;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * @author zhengxiaosu
@@ -17,8 +15,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @FeignClient("es-operation-service")
 public interface IEsOperationFacade {
 
-    @PostMapping("test")
-    String test(@RequestBody TestRequest request);
 //    /**
 //     * 批量插入文档
 //     */

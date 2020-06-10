@@ -7,6 +7,7 @@ import com.yundasys.es.operation.constant.ClientErrorCode;
 import com.yundasys.es.operation.exception.ClientBussinessException;
 import com.yundasys.es.operation.model.Range;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.StringUtils;
 

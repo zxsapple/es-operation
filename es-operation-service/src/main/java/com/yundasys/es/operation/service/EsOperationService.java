@@ -42,9 +42,6 @@ public class EsOperationService{
     @Autowired
     private ESResponseHelper esResponseHelper;
 
-
-
-
     public SearchResult docQuery(SearchByConditionRequest request) {
         IndexInfo indexInfo = request.getIndexInfo();
         SearchCondition condition = request.getSearchCondition();
@@ -64,8 +61,8 @@ public class EsOperationService{
             searchRequest.scroll(new TimeValue(2, TimeUnit.MINUTES));
         }
         // agg parameter
-        esBuilderHelper.buildAggs(indexInfo, condition.getAggConditions(), sourceBuilder);
 
+        esBuilderHelper.buildAggs(indexInfo, condition.getAggDateCondition(), sourceBuilder);
         // return fields
         if (condition.getIncludes() != null) {
             sourceBuilder.fetchSource(condition.getIncludes(), null);
@@ -89,11 +86,10 @@ public class EsOperationService{
             log.info("查询es语句:\n{}", sourceBuilder);
             searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
         } catch (Exception e) {
-            log.warn("docSearch 条件查询es错误:{} useScroll:{} e:{}", sourceBuilder.toString(), useScroll, e);
+            log.error("docSearch 条件查询es错误:{} useScroll:{} e:{}", sourceBuilder.toString(), useScroll, e);
             throw new ESOperationException(ESErrorCode.ES_OPERATE_FAIL, e.getMessage());
         }
 
-        // convert search response
-        return esResponseHelper.dealSearchResult(searchResponse, condition.getAggConditions());
+        return esResponseHelper.dealSearchResult(searchResponse, condition.getAggDateCondition());
     }
 }
