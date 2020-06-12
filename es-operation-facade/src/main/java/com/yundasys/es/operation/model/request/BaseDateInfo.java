@@ -12,7 +12,7 @@ import java.util.List;
  */
 @Data
 public class BaseDateInfo {
-    String interval; // 统计区间
+    String interval; // 统计区间   DateInterval.class类里有常用的
 
     SortType sortType; // 排序方式
 

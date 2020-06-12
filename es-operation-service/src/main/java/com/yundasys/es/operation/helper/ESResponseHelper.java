@@ -116,9 +116,6 @@ public class ESResponseHelper {
                     return dealGroupBy(aggCondition, (ParsedStringTerms) aggregation);
                 } else if (aggregation instanceof ParsedSum) {//没有group by字段
                     dealParsedNum(noneBucketData, aggregation);
-                } else {
-                    log.error("agg处理结果是发现未知类型");
-                    throw new RuntimeException("不知道什么类型");
                 }
             }
             return Collections.singletonList(noneBucketData);

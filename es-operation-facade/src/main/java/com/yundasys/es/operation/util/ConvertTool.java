@@ -2,10 +2,13 @@ package com.yundasys.es.operation.util;
 
 import com.yundasys.es.operation.annotation.ExtendOredCriteria;
 import com.yundasys.es.operation.annotation.FieldOption;
+import com.yundasys.es.operation.constant.ClientErrorCode;
 import com.yundasys.es.operation.constant.SearchType;
+import com.yundasys.es.operation.exception.ClientBussinessException;
 import com.yundasys.es.operation.model.request.CompoundCriteria;
 import com.yundasys.es.operation.model.request.Criteria;
 import com.yundasys.es.operation.model.request.SearchField;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.lang.reflect.Field;
@@ -18,6 +21,7 @@ import java.util.List;
  * @desc  客户端条件转为 es组件需要的condition
  * @date 2020/6/8 13:53
  */
+@Slf4j
 public class ConvertTool {
 
     /**
@@ -60,7 +64,8 @@ public class ConvertTool {
 			try {
 				fieldObj = field.get(target);
 			} catch (IllegalArgumentException | IllegalAccessException e) {
-				throw new RuntimeException(e);
+                log.error("转换field 有误 ", e);
+				throw new ClientBussinessException(ClientErrorCode.PARAMETER_INCORRECT,"Criteria转换错误");
 			}
             
             if (fieldObj == null) {

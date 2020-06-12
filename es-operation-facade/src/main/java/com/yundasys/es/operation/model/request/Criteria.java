@@ -1,5 +1,7 @@
 package com.yundasys.es.operation.model.request;
 
+import com.yundasys.es.operation.constant.ESErrorCode;
+import com.yundasys.es.operation.exception.ESOperationException;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -19,7 +21,7 @@ public class Criteria implements Serializable {
 
     public Criteria addCriterion(SearchField condition) {
         if (condition == null) {
-            throw new RuntimeException("condition cannot be null");
+            throw new ESOperationException(ESErrorCode.PARAMETER_INCORRECT, "condition cannot be null");
         }
         criteria.add(condition);
 
