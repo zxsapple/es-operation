@@ -5,8 +5,6 @@ import com.yundasys.es.operation.constant.ESErrorCode;
 import java.io.Serializable;
 
 public class ESBaseResponse<T> implements Serializable {
-
-    private static final long serialVersionUID = -321165040443207334L;
     
     private int code;//一级状态码
     private int status;//二级状态码

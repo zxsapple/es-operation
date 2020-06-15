@@ -2,7 +2,6 @@ package com.yundasys.es.operation.exception;
 
 
 public class ClientBussinessException extends RuntimeException {
-	private static final long serialVersionUID = -7767159705208743978L;
 	
 	private int code;
     

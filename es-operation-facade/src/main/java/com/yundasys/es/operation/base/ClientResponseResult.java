@@ -12,7 +12,6 @@ import java.util.List;
  */
 @Data
 public class ClientResponseResult<D> implements Serializable {
-	private static final long serialVersionUID = 6544107910440001815L;
 	
 	ClientPageInfo<D> pageInfo;
 

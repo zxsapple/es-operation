@@ -36,7 +36,7 @@ import java.util.List;
  * @date 2018/6/29 16:22
  */
 @Slf4j
-public abstract class BaseBiz {
+public abstract class BaseClient {
 
 
     @Autowired

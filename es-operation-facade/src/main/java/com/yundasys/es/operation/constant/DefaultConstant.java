@@ -16,9 +16,4 @@ public interface DefaultConstant {
     //app默认流量
     int DEFAULT_PERMITS = 10;
 
-    /**
-     * es中间件分割聚合key符号
-     */
-    String SPLIT_CHAR = "#";
-
 }

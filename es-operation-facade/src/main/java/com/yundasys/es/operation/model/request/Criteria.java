@@ -10,7 +10,6 @@ import java.util.List;
 
 @Data
 public class Criteria implements Serializable {
-    private static final long serialVersionUID = 7307266810297781432L;
 
     private List<SearchField> criteria;
 

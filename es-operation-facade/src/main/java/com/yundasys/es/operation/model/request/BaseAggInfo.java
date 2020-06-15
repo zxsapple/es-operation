@@ -5,15 +5,15 @@ import lombok.Data;
 
 /**
  * @author zhengxiaosu
- * @desc
+ * @desc  日期汇总基础类
  * @date 2020/6/8 14:16
  */
 @Data
-public class BaseAggInfo {
+public abstract class BaseAggInfo {
     String[] sortField;//排序字段
 
     SortType[] sortType;//排序方式
 
-    Long size;
+    Long size;//聚合的最大数据量 越大越耗es性能
 }
 

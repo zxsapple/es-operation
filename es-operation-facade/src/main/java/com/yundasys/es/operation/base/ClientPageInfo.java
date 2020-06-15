@@ -11,7 +11,6 @@ import java.util.List;
  */
 @Data
 public class ClientPageInfo<T> implements Serializable {
-    private static final long serialVersionUID = -4973069067478682582L;
     /**
      * 总记录数
      */

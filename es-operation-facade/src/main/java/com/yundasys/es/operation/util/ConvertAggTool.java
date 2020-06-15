@@ -52,7 +52,7 @@ public class ConvertAggTool {
     /**
      * 汇总class AggCalField 类转换为 汇总计算字段
      */
-    private static CalField[] getCalFields(Class clz) {
+    private static CalField[] getCalFields(Class<?> clz) {
         Field[] cals = FieldUtils.getFieldsWithAnnotation(clz, AggCalField.class);
 
         if (BaseAggInfo.class.isAssignableFrom(clz) && ArrayUtils.isEmpty(cals)) {
@@ -80,10 +80,10 @@ public class ConvertAggTool {
 
         Field[] fields = FieldUtils.getFieldsWithAnnotation(clz, AggDateField.class);
         if (fields.length != 1) {
-            throw new ESOperationException(ESErrorCode.PARAMETER_INCORRECT, "AggDateField 注解的字段必须有且只有一个");
+            throw new ESOperationException(ESErrorCode.PARAMETER_INCORRECT, "@AggDateField 注解的字段必须有且只有一个");
         }
         if (!Date.class.equals(fields[0].getType())) {
-            throw new ESOperationException(ESErrorCode.PARAMETER_INCORRECT, "AggDateField 必须修饰java.util.Date类型");
+            throw new ESOperationException(ESErrorCode.PARAMETER_INCORRECT, "@AggDateField 必须修饰java.util.Date类型");
         }
         CalField[] calFields = getCalFields(clz);
         aggDateCondition.setCalFields(calFields);

@@ -8,7 +8,6 @@ import java.util.List;
 
 @Data
 public class CompoundCriteria implements Serializable {
-    private static final long serialVersionUID = 6712375055890599609L;
     
     private List<Criteria> oredCriteria= new ArrayList<>();; // or连接所有and
     private List<Criteria> extendOredCriteria=new ArrayList<>(); // and连接所有or

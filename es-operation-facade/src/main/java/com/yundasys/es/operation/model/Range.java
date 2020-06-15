@@ -3,7 +3,6 @@ package com.yundasys.es.operation.model;
 import java.io.Serializable;
 
 public class Range implements Serializable {
-    private static final long serialVersionUID = 89050826020349158L;
     
     private Item from;
     private Item to;
@@ -57,7 +56,6 @@ public class Range implements Serializable {
     }
 
     public class Item implements Serializable {
-        private static final long serialVersionUID = -7592931100446416513L;
         
         private Object value;
         private boolean include;

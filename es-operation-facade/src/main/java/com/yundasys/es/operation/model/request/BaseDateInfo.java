@@ -7,11 +7,11 @@ import java.util.List;
 
 /**
  * @author zhengxiaosu
- * @desc
+ * @desc 普通汇总基础类
  * @date 2020/6/8 15:34
  */
 @Data
-public class BaseDateInfo {
+public abstract class BaseDateInfo {
     String interval; // 统计区间   DateInterval.class类里有常用的
 
     SortType sortType; // 排序方式

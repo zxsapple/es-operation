@@ -3,8 +3,6 @@ package com.yundasys.es.operation.exception;
 
 public class ESOperationException extends RuntimeException {
 
-    private static final long serialVersionUID = -1309219042672149450L;
-
     private int code;
     
     public int getCode() {

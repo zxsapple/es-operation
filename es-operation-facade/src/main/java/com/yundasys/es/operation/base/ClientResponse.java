@@ -11,7 +11,6 @@ import java.io.Serializable;
  */
 @Data
 public class ClientResponse<T> implements Serializable {
-    private static final long serialVersionUID = -4529886210621256385L;
 
     int code;
     String msg;
