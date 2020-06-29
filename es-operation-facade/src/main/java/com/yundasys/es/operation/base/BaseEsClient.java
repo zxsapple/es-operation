@@ -42,7 +42,7 @@ public class BaseEsClient {
 
 
     @Autowired
-    protected IEsOperationFacade esOperationFacade;
+    private IEsOperationFacade esOperationFacade;
 
     /**
      * @return
@@ -50,7 +50,7 @@ public class BaseEsClient {
      * @author zhengxiaosu
      * @date 2018/6/26 16:21
      */
-    protected <D> ClientResponseResult<D> getEsResponse(ESRequest<D> esRequest) {
+    public  <D> ClientResponseResult<D> getEsResponse(ESRequest<D> esRequest) {
         SearchResult searchResult = queryES(esRequest);
 
         return setResult(esRequest, searchResult);
@@ -59,7 +59,7 @@ public class BaseEsClient {
     /**
      * 请求es返回原始数据
      */
-    protected <D> SearchResult queryES(ESRequest<D> esRequest) {
+    public  <D> SearchResult queryES(ESRequest<D> esRequest) {
 
         ClientRequest<?> request = esRequest.getRequest();
         if (request.isUseScroll()) {
@@ -139,7 +139,7 @@ public class BaseEsClient {
     /**
      * 将es返回的数据进行结果集封装
      */
-    private <D> ClientResponseResult<D> setResult(ESRequest<D> esRequest, SearchResult searchResult) {
+    public  <D> ClientResponseResult<D> setResult(ESRequest<D> esRequest, SearchResult searchResult) {
 
         Class<D> dtoClz = esRequest.getDtoClz();
 
@@ -157,7 +157,7 @@ public class BaseEsClient {
     /**
      * 客户端的agg信息 封装
      */
-    private <D> List<? extends Object> setSummaryInfo(ESRequest<D> esRequest, SearchResult searchResult) {
+    public  <D> List<? extends Object> setSummaryInfo(ESRequest<D> esRequest, SearchResult searchResult) {
 
         if (CollectionUtils.isEmpty(searchResult.getAggregations())) {
             return null;
@@ -191,7 +191,7 @@ public class BaseEsClient {
     /**
      * 根据条件只查total数
      */
-    protected long getEsSizeNum(ESRequest esRequest) {
+    public long getEsSizeNum(ESRequest esRequest) {
         esRequest.setAggInfo(null);
         esRequest.setDateInfo(null);
         esRequest.setDtoClz(null);
