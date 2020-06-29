@@ -24,6 +24,7 @@ import com.yundasys.es.operation.model.request.BaseDateInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -36,7 +37,8 @@ import java.util.List;
  * @date 2018/6/29 16:22
  */
 @Slf4j
-public abstract class BaseClient {
+@Component
+public class BaseEsClient {
 
 
     @Autowired
